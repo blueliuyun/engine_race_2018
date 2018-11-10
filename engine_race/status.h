@@ -5,9 +5,9 @@
 #include <algorithm>
 #include <string>
 //#include "leveldb/export.h"
-//#include "leveldb/slice.h"
+#include "slice.h"
 
-namespace leveldb {
+namespace polar_race {
 
 class Status {
  public:
@@ -105,6 +105,6 @@ inline Status& Status::operator=(Status&& rhs) noexcept {
   return *this;
 }
 
-}  // namespace leveldb
+}  // namespace polar_race
 
-#endif  // STORAGE_LEVELDB_INCLUDE_STATUS_H_
+#endif  // ENGINE_RACE_STATUS_H_

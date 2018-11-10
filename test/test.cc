@@ -30,7 +30,9 @@ int main() {
   RetCode ret = Engine::Open(kEnginePath, &engine);
   assert (ret == kSucc);
 
+  std::string value;
 
+/*
   ret = engine->Write("aaa", "aaaaaaaaaaa");
   assert (ret == kSucc);
   ret = engine->Write("aaa", "111111111111111111111111111111111111111111");
@@ -41,21 +43,25 @@ int main() {
   ret = engine->Write("bbb", "bbbbbbbbbbbb");
   assert (ret == kSucc);
 
-  ret = engine->Write("ccd", "cbbbbbbbbbbbb");
-  std::string value;
+  ret = engine->Write("80", "cbbbbbbbbbbbb80");
   ret = engine->Read("aaa", &value);
   printf("Read aaa value: %s\n", value.c_str());
   
   ret = engine->Read("bbb", &value);
   assert (ret == kSucc);
   printf("Read bbb value: %s\n", value.c_str());
+*/
+  ret = engine->Read("80", &value);
+  assert (ret == kSucc);
+  printf("Read 80 value: %s\n", value.c_str());
 
+/*
   int key_cnt = 0;
   DumpVisitor vistor(&key_cnt);
   ret = engine->Range("b", "", vistor);
   assert (ret == kSucc);
   printf("Range key cnt: %d\n", key_cnt);
-  
+*/  
 
   delete engine;
 
