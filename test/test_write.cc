@@ -152,11 +152,26 @@ void write(Engine* engine, threadsafe_vector<std::string>& keys, unsigned numWri
 //		if(engine->Read(key, &RdVal) != kSucc){
 //			std::cout << "Read	not Found. \r\n" << std::endl;
 //		}
-		assert(engine->Read(key, &RdVal) == kSucc);
+		//engine->Read(key, &RdVal);
 		
-		std::cout << "Read		Key= " << key << "	RdVal= " << RdVal << std::endl;
-        keys.add(key);
+		//std::cout << "Read		Key= " << key << "	RdVal= " << RdVal << std::endl;
+        //keys.add(key);
     }
+
+#if 0
+	for (unsigned i = 1; i <= nWriteCnt; ++i) {	
+		std::string RdVal;	
+		std::string key(std::to_string(i));
+	
+		engine->Read(key, &RdVal);
+		if(key != RdVal){
+			std::cout << "Read		Key= " << key << "	RdVal= " << RdVal << std::endl;			
+			exit(-1);
+		}
+		
+	}
+#endif //#if 0
+	
 }
 
 void randomRead(Engine* engine, const threadsafe_vector<std::string>& keys, 
@@ -271,8 +286,10 @@ int main()
     threadsafe_vector<std::string> keys;
 
     // Write
-    unsigned numWrite = /*10000*/400, numKills = 4;
+    unsigned numWrite = /*10000*/64000000, numKills = 4;
     double duration = 0;
+#if 0 
+    // Muti-Thread
     for (int nk = 0; nk < numKills; ++nk) {
         RetCode ret = Engine::Open(kEnginePath, &engine);
         assert (ret == kSucc);
@@ -297,7 +314,35 @@ int main()
     std::cout << "Writing takes: "
               << duration
               << " milliseconds" << std::endl;
-    
+#endif //#if 0
+
+#if 1 
+	{
+        RetCode ret = Engine::Open(kEnginePath, &engine);
+        assert (ret == kSucc);        
+
+		for(nWriteCnt=1 ; nWriteCnt <= numWrite; nWriteCnt++)
+		{		
+			std::string RdVal;
+			//std::string val(random_str(rng, 4096));
+			std::string val(std::to_string(nWriteCnt));
+
+			//std::string key = hash_to_str(fnv1_hash_64(val)); // strong hash, slow but barely any chance to duplicate
+			//std::string key(key_from_value(val)); // random positions, faster but tiny chance to duplicate
+			std::string key(std::to_string(nWriteCnt));
+
+			engine->Write(key, val);
+			//		if(engine->Read(key, &RdVal) != kSucc){
+			//			std::cout << "Read	not Found. \r\n" << std::endl;
+			//		}
+			//engine->Read(key, &RdVal);
+
+			//std::cout << "Read		Key= " << key << "	RdVal= " << RdVal << std::endl;		
+		}        
+        delete engine;
+    }
+#endif //#if 0
+
 	//---test close Write...	
     return 0;
 

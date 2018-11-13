@@ -86,7 +86,7 @@ struct Options {
   // one open file per 2MB of working set).
   //
   // Default: 1000
-  int max_open_files;
+  int max_open_files; //@2018-11-11 建议不要修改这个 1000， 因为已经低于linux默认的1024最大文件打开数。
 
   // Control over blocks (user data is stored in a set of blocks, and
   // a block is the unit of reading from disk).

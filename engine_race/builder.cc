@@ -33,7 +33,7 @@ Status BuildTable(const std::string& dbname,
 
     TableBuilder* builder = new TableBuilder(options, file);
     meta->smallest.DecodeFrom(iter->key());
-	/** BY tianye 遍历 MemTable 的跳表，按照 key 的大小，有序地插入 SSTable*/
+	/** BY tianye 遍历 MemTable 的跳表，按照 key 的大小，有序地插入 SSTable，	Key 值是从小到大来排列 。 */
     for (; iter->Valid(); iter->Next()) {
       Slice key = iter->key();
       meta->largest.DecodeFrom(key);
@@ -43,7 +43,7 @@ Status BuildTable(const std::string& dbname,
     // Finish and check for builder errors
     /**
      * 所有的 key value pair 插入后，
-     * 调用 Finish() ，按照 SSTable 中讲的那样，加上  Meta block，MetaIndex block，Index block 和 Footer
+     * 调用 Finish() ，按照 SSTable 中讲的那样，加上  Meta block，MetaIndex block，Index block 和 Footer 。
      */
     s = builder->Finish();
     if (s.ok()) {

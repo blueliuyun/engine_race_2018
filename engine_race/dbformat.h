@@ -17,16 +17,16 @@ namespace polar_race {
 // parameters set via options.
 namespace config {
 /** BY tianye @2018-10-11 level 总层数 */
-static const int kNumLevels = 7;
+static const int kNumLevels = /* 7 */ /** 70 @2018-11-12 18:58*/ 7;
 
 // Level-0 compaction is started when we hit this many files.
-static const int kL0_CompactionTrigger = 4;
+static const int kL0_CompactionTrigger = /* 4 */ /** 80 @2018-11-12 18:58*/ 4;
 
 // Soft limit on number of level-0 files.  We slow down writes at this point.
-static const int kL0_SlowdownWritesTrigger = 8;
+static const int kL0_SlowdownWritesTrigger = /* 8 */ /** 160 @2018-11-12 18:58*/ 256;
 
 // Maximum number of level-0 files.  We stop writes at this point.
-static const int kL0_StopWritesTrigger = 12;
+static const int kL0_StopWritesTrigger = /* 12 */ /** 240 @2018-11-12 18:58*/ 512;
 
 // Maximum level to which a new compacted memtable is pushed if it
 // does not create overlap.  We try to push to level 2 to avoid the

@@ -520,7 +520,8 @@ class PosixEnv : public Env {
 
   virtual Status CreateDir(const std::string& name) {
     Status result;
-    if (mkdir(name.c_str(), 0755) != 0) {
+    if (mkdir(name.c_str(), 0755) != 0) { //@2018-11-11 出现  rm: cannot remove ‘test_directory/’: Directory not empty 
+    									   //  尝试修改权限 777 ，但是未解决问题。所以恢复 755。
       result = PosixError(name, errno);
     }
     return result;
@@ -582,6 +583,8 @@ class PosixEnv : public Env {
     if (LockOrUnlock(my_lock->fd_, false) == -1) {
       result = PosixError("unlock", errno);
     }
+	//@2018-11-11 Test Unlock
+	printf("In [ PosixEnv::UnlockFile() ] \r\n");
     locks_.Remove(my_lock->name_);
     close(my_lock->fd_);
     delete my_lock;

@@ -330,14 +330,16 @@ int main()
 	std::cout << " nReadLostCnt = " << nReadLostCnt << std::endl;
 */
 	std::string value;
-	for(nReadCnt=1; nReadCnt<=/*20000*/800; nReadCnt++){
+	for(nReadCnt=1; nReadCnt<=/*20000*/64000000; nReadCnt++){
 		ret = engine->Read(std::to_string(nReadCnt), &value);
 		//assert (ret == kSucc);		
 	    if((ret != kSucc)){
 			nReadLostCnt++;			
-			//printf("Read %d value: %s\n", nReadCnt, value.c_str());
 			printf("Read %d not found. \n", nReadCnt);
-		}
+			delete engine;
+			return 0;
+		}		
+		printf("Read %d value: %s\n", nReadCnt, value.c_str());
 	}
 	printf("Read nReadLostCnt: %d\n", nReadLostCnt);
 

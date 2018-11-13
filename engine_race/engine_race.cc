@@ -48,7 +48,7 @@ RetCode EngineRace::Open(const std::string& name, Engine** eptr) {
 	*eptr = NULL;
 	//--2018-11-04   注意下面几个变量的声明周期。
 	Options opts;  
-	opts.create_if_missing = true;  
+	opts.create_if_missing = true;
 	// Recover handles create_if_missing, error_if_exists
 	bool save_manifest = false;	
 	static uint64_t tmpO = 0;
@@ -65,12 +65,13 @@ RetCode EngineRace::Open(const std::string& name, Engine** eptr) {
 	Status s = engine_race->Recover(&edit, &save_manifest);
 	//---@2018-11-08 增加 read 时打开异常的处理.
 	if (s.IsIOError()) {		
-		printf("In [ EngineRace::Open ] == s.IsIOError \r\n");
+		printf("In [ EngineRace::Open ] == s.IsIOError \r\n");		
+		delete engine_race;
 		return kIOError;
 	}
 
 	if (s.ok() && engine_race->mem_ == nullptr) {
-		printf("[ EngineRace::Open : impl->mem_ == NULL \r\n]");
+		//printf("[ EngineRace::Open : impl->mem_ == NULL ] \r\n");
 		//--- 1. impl->mem_ == NULL 说明没有继续使用旧日志需创建新的日志.
 		//--- 2. 从version_set 获取一个新的文件序号用于日志文件，所以如果是新建的数据库，
 		//---    则第一个log 序号为 2 （因为序号 1 已经被 manifest 占用, 在 NewDB 代码可以看出 ） 
@@ -110,7 +111,8 @@ RetCode EngineRace::Open(const std::string& name, Engine** eptr) {
 		//---*eptr 接管 engine_race 申请的内存空间数据, 并传递给外部调用的函数。
 		*eptr = engine_race;
 	} else {
-		delete eptr;        
+		delete engine_race;
+		delete eptr;		
 	}
 	
 	printf("Out [ EngineRace::Open ] \r\n");	
@@ -134,15 +136,26 @@ Options SanitizeOptions(const std::string& dbname,
   result.filter_policy = (src.filter_policy != nullptr) ? ipolicy : nullptr;
   ClipToRange(&result.max_open_files,    64 + kNumNonTableCacheFiles, 50000);
   ClipToRange(&result.write_buffer_size, 64<<10,                      1<<30);
-  ClipToRange(&result.max_file_size,     1<<20,                       1<<30);
+  ClipToRange(&result.max_file_size,     1<<20,                       1<<30); //--@2018-11-11 单个 .ldb 文件大小范围  1M ~ 1G Byte 之间。
   ClipToRange(&result.block_size,        1<<10,                       4<<20);
   //--- 如果用户未指定 info log 文件（用于打印状态等文本信息的日志文件），则由引擎自己创建一个。
   if (result.info_log == nullptr) {
     // Open a log file in the same directory as the db
-    src.env->CreateDir(dbname);  // In case it does not exist---如果目录不存在则创建。
+	//@2018-11-10 
+	Status s;
+	bool b = src.env->FileExists(dbname);
+	if(false == b){
+		// In case it does not exist---如果目录不存在则创建。
+		s = src.env->CreateDir(dbname);
+		//--文件夹不存在, 并且新创建文件夾失敗, IOError
+		if(!s.ok()){
+			//--@2018-11-10 (1) 避免文件夹已经存在，而再次调用 mkdir 失败； (2) 由于函数返回值的原因，暂且不在此处 return。
+		}
+	}
+	
     //--- 如果已存在以前的 info log 文件，则将其改名为 LOG.old，然后创建新的 log 文件与日志...
     src.env->RenameFile(InfoLogFileName(dbname), OldInfoLogFileName(dbname));
-    Status s = src.env->NewLogger(InfoLogFileName(dbname), &result.info_log);
+    /*Status */ s = src.env->NewLogger(InfoLogFileName(dbname), &result.info_log);
     if (!s.ok()) {
       // No place suitable for logging
       result.info_log = nullptr;
@@ -233,7 +246,7 @@ EngineRace::EngineRace(const Options& raw_options, const std::string& dbname)
 EngineRace::~EngineRace() {
 	//@2018-11-08 Test tianye	
 	static uint64_t tmpEngineD = 0;
-	printf("In [ EngineRace::~EngineRace ] %ld \r\n", tmpEngineD++);
+	//printf("In [ EngineRace::~EngineRace ] %ld \r\n", tmpEngineD++);
 
 	// Wait for background work to finish
 	mutex_.Lock();	
@@ -245,6 +258,8 @@ EngineRace::~EngineRace() {
 	
 	if (db_lock_ != nullptr) {
 	  env_->UnlockFile(db_lock_); //---解锁操作
+	  //@2018-11-11 Test if run this
+	  printf("In [ EngineRace::~EngineRace() : UnlockFile ] \r\n");
 	}
 	
 	delete versions_;
@@ -255,14 +270,15 @@ EngineRace::~EngineRace() {
 	delete log_;
 	delete logfile_;
 	delete table_cache_;
-#if 0
+	
 	if (owns_info_log_) {
 		delete options_.info_log;
 	}
 	if (owns_cache_) {
 		delete options_.block_cache;
 	}
-#endif //#if 0	
+	
+	printf("Out [ EngineRace::~EngineRace ] %ld \r\n", tmpEngineD++);
 }
 
 // 3. Write a key-value pair into engine
@@ -277,7 +293,7 @@ RetCode EngineRace::Write(const PolarString& key, const PolarString& value) {
 	//---w1. Write 操作会将 (key,value) 转化成 WriteBatch 后，通过 WriteDB 接口来完成 batch  一批写入。  
 	//---w2. 使用类型转换。 
 	batch.Put(reinterpret_cast<const Slice&>(key), reinterpret_cast<const Slice&>(value));
-	opt.sync = true;
+	opt.sync = false; //true;
     WriteDB(opt, &batch);
 	
 	//printf("Out [ EngineRace::Write ] \r\n");
@@ -296,7 +312,7 @@ RetCode EngineRace::Write(const PolarString& key, const PolarString& value) {
 Status EngineRace::WriteDB(const WriteOptions& options, WriteBatch* my_batch) {
 	Writer w(&mutex_);
 	w.batch = my_batch;
-	w.sync = options.sync; //---log 是否马上刷到磁盘,如果 false 会有数据丢失的风险。
+	w.sync = options.sync; //---log 是否马上刷到磁盘, 如果 false 会有数据丢失的风险。
 	w.done = false; //---标记写入是否完成。
 
 	//static uint64_t tmpWDB = 0;
@@ -409,6 +425,11 @@ Status EngineRace::ReadDB(const ReadOptions& options, const Slice& key, std::str
 	MutexLock l(&mutex_);
 	//---版本号, 可以读取指定版本的数据, 否则读取最新版本的数据。
 	SequenceNumber snapshot;
+	
+	static uint64_t tmpR = 0;
+	tmpR++;
+	//printf("In [ EngineRace::ReadDB() ] %ld \r\n", tmpR);
+
 	//---R.1. 注意 : 读取的时候数据也是会有插入操作的，假如 Get 请求先到来, 而 Put 后插入一条数据, 
 	//---    这时候新数据并不会被读取到。	
 	if (options.snapshot != nullptr) {
@@ -455,6 +476,10 @@ Status EngineRace::ReadDB(const ReadOptions& options, const Slice& key, std::str
 	mem->Unref();
 	if (imm != nullptr) imm->Unref();
 	current->Unref();
+
+	if(1){
+		printf("Out [ EngineRace::ReadDB() ] %ld \r\n", tmpR);
+	}
 	
 	return s;
 }
@@ -500,7 +525,8 @@ Status EngineRace::Recover(VersionEdit* edit, bool* save_manifest)
 	
 	assert(db_lock_ == nullptr);
 	//---锁上数据库。在 DB 目录下打开或创建（如果不存在）LOCK 文件并锁定它，防止其他进程打开此表。	
-	s = env_->LockFile(LockFileName(dbname_), &db_lock_);
+	s = env_->LockFile(LockFileName(dbname_), &db_lock_);	
+	printf("In [ EngineRace::Recover() : LockFile ] \r\n");
 	if (!s.ok()) {
 	  return s;
 	}
@@ -734,7 +760,7 @@ Status EngineRace::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
       (unsigned long long) meta.number,
       (unsigned long long) meta.file_size,
       s.ToString().c_str());
-  delete iter;
+  delete iter; //--- iter 用完之后一定要删除。
   pending_outputs_.erase(meta.number);
 
 
@@ -761,17 +787,16 @@ Status EngineRace::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
 /**
  * @2018-10-21 BY tianye
  * 1. 将内存中的 MemTable dump 到磁盘上，形成 SSTable 文件。
- * 
  */
 void EngineRace::CompactMemTable() {
   mutex_.AssertHeld();
-  assert(imm_ != nullptr);
+  assert(imm_ != nullptr); //--- imm_不能为空
 
   // Save the contents of the memtable as a new Table
   VersionEdit edit;
   Version* base = versions_->current();
   base->Ref();
-  Status s = WriteLevel0Table(imm_, &edit, base);
+  Status s = WriteLevel0Table(imm_, &edit, base); //c1.--- 将 Memtable 转化为 .sst 文件，并写入到 edit
   base->Unref();
 
   if (s.ok() && shutting_down_.Acquire_Load()) {
@@ -782,7 +807,7 @@ void EngineRace::CompactMemTable() {
   if (s.ok()) {
     edit.SetPrevLogNumber(0);
     edit.SetLogNumber(logfile_number_);  // Earlier logs no longer needed
-    s = versions_->LogAndApply(&edit, &mutex_);
+    s = versions_->LogAndApply(&edit, &mutex_); //c2.---应用 edit 中记录的变化，来生成新的版本.
   }
 
   if (s.ok()) {
@@ -849,7 +874,7 @@ void EngineRace::DeleteObsoleteFiles() {
             static_cast<int>(type),
             static_cast<unsigned long long>(number));
         env_->DeleteFile(dbname_ + "/" + filenames[i]);
-		printf("[ EngineRace::DeleteObsoleteFiles() - %s ]\r\n", filenames[i].c_str());
+		//printf("[ EngineRace::DeleteObsoleteFiles() - %s ]\r\n", filenames[i].c_str());
       }
     }
   }
@@ -1412,12 +1437,13 @@ Status EngineRace::MakeRoomForWrite(bool force) {
       // individual write by 1ms to reduce latency variance.  Also,
       // this delay hands over some CPU to the compaction thread in
       // case it is sharing the same core as the writer.
-      mutex_.Unlock();
+      mutex_.Unlock();	  
+	  printf("In [ EngineRace::MakeRoomForWrite() ] >= config::kL0_SlowdownWritesTrigger \r\n");
       env_->SleepForMicroseconds(1000);
       allow_delay = false;  // Do not delay a single write more than once
       mutex_.Lock();
     } else if (!force &&
-               (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {               
+               (mem_->ApproximateMemoryUsage() <= options_.write_buffer_size)) {
 	  /** Ma.s3 如果 memtable 的大小小于4MB（默认值，可以修改），直接返回可以插入。 */
       // There is room in current memtable
       break;
@@ -1428,7 +1454,8 @@ Status EngineRace::MakeRoomForWrite(bool force) {
       Log(options_.info_log, "Current memtable full; waiting...\n"); //---等待之前的 imuable memtable 完成 compact 到 level0。
       background_work_finished_signal_.Wait(); //---后台程序的条件变量, 后台程序就是做 compact 的。
     } else if (versions_->NumLevelFiles(0) >= config::kL0_StopWritesTrigger) { //---level0 的文件数超过 12, 强制等待.
-      /** Ma.s5 到达 .s5 说明旧的 Imuable memtable 已经 compact 到level 0了，这时候假如level 0的文件数目到达了12个，也需要等待。 */
+      /** Ma.s5 到达 .s5 说明旧的 Imuable memtable 已经 compact 到level 0了，这时候假如level 0的文件数目到达了12个，也需要等待。 */	
+	  printf("In [ EngineRace::MakeRoomForWrite() ] >= config::kL0_StopWritesTrigger \r\n");
       // There are too many level-0 files.
       Log(options_.info_log, "Too many L0 files; waiting...\n");
       background_work_finished_signal_.Wait();
